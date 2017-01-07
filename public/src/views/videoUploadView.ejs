@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Unleash &amp; Break</title>
+    <meta name="generator" content="Bootply" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <!-- inject:js -->
+    <!-- endinject -->
+
+    <!-- inject:css -->
+    <link rel="stylesheet" href="/css/styles.css">
+    <!-- endinject -->
+
+    <!-- bower:css -->
+    <link rel="stylesheet" href="../../lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../lib/font-awesome/css/font-awesome.min.css" />
+    <!-- endbower -->
+
+    <!-- bower:js -->
+    <script src="../../lib/jquery/dist/jquery.js"></script>
+    <script src="../../lib/bootstrap/dist/js/bootstrap.js"></script>
+    <!-- endbower -->
+    <!--[if lt IE 9]>
+			<script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
+		<![endif]-->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        window.addEventListener("load", Ready);
+
+        function Ready() {
+            if (window.File && window.FileReader) { //These are the relevant HTML5 objects that we are going to use 
+                document.getElementById('UploadButton').addEventListener('click', StartUpload);
+                document.getElementById('FileBox').addEventListener('change', FileChosen);
+            } else {
+                document.getElementById('UploadArea').innerHTML = "Your Browser Doesn't Support The File API Please Update Your Browser";
+            }
+        }
+
+        var SelectedFile;
+
+        function FileChosen(evnt) {
+            SelectedFile = evnt.target.files[0];
+            document.getElementById('NameBox').value = SelectedFile.name;
+        }
+
+        //        function FileChosen(evnt) {
+        //            SelectedFile = evnt.target.files[0];
+        //            document.getElementById('NameBox').value = SelectedFile.name;
+        //             var FReader = new FileReader();
+        //            alert("reader.onload 1 called");
+        //             FReader.onload = function (evnt) {
+        //                 alert("reader.onload called");
+        //                    console.log('uploading file frontend');
+        //                    socket.emit('Upload', {
+        //                        'Name': Name,
+        //                        Data: evnt.target.result
+        //                    });
+        //                }
+        //              FReader.readAsDataURL(SelectedFile);
+        //        }
+
+        var socket = io.connect('http://localhost:5000');
+        var FReader;
+        var Name;
+
+        function StartUpload() {
+            if (document.getElementById('FileBox').value != "") {
+                FReader = new FileReader();
+                Name = document.getElementById('NameBox').value;
+                var Content = "<span id='NameArea'>Uploading " + SelectedFile.name + " as " + Name + "</span>";
+                Content += '<div id="ProgressContainer"><div id="ProgressBar"></div></div><span id="percent">0%</span>';
+                Content += "<span id='Uploaded'> - <span id='MB'>0</span>/" + Math.round(SelectedFile.size / 1048576) + "MB</span>";
+                document.getElementById('UploadArea').innerHTML = Content;
+                FReader.onload = function (evnt) {
+                    socket.emit('Upload', {
+                        'Name': Name,
+                        Data: evnt.target.result
+                    });
+                }
+
+                socket.emit('Start', {
+                    'Name': Name,
+                    'Size': SelectedFile.size
+                });
+
+                socket.on('MoreData', function (data) {
+                    console.log('socket getting more data');
+                    UpdateBar(data['Percent']);
+                    var Place = data['Place'] * 524288; //The Next Blocks Starting Position
+                    var NewFile; //The Variable that will hold the new Block of Data
+                    if (SelectedFile.webkitSlice)
+                        NewFile = SelectedFile.slice(Place, Place + Math.min(524288, (SelectedFile.size - Place)));
+                    else
+                        NewFile = SelectedFile.slice(Place, Place + Math.min(524288, (SelectedFile.size - Place)));
+                    FReader.readAsBinaryString(NewFile);
+                });
+                var Path = "http://localhost:5000/";
+
+                socket.on('Done', function (data) {
+                    var Content = "Video Successfully Uploaded !!"
+                    console.log(Path + data['Image']);
+                    Content +=
+                        "<video width='400' controls style='display: block; float: left;'> <source src = '" + Path + data['Image'] + "' type = 'video/mp4'> Your browser does not support HTML5 video. </video><br>"
+                    Content += "<button  type='button' name='Upload' value='' id='Restart' class='Button'>Upload Another</button>";
+                    document.getElementById('UploadArea').innerHTML = Content;
+                    document.getElementById('Restart').addEventListener('click', Refresh);
+                });
+
+                function Refresh() {
+                    location.reload(true);
+                }
+
+            } else {
+                alert("Please Select A File");
+            }
+        }
+
+        function UpdateBar(percent) {
+            document.getElementById('ProgressBar').style.width = percent + '%';
+            document.getElementById('percent').innerHTML = (Math.round(percent * 100) / 100) + '%';
+            var MBDone = Math.round(((percent / 100.0) * SelectedFile.size) / 1048576);
+            document.getElementById('MB').innerHTML = MBDone;
+        }
+    </script>
+
+</head>
+
+<body>
+    <header class="navbar navbar-bright navbar-fixed-top" role="banner">
+        <div class="container">
+            <div class="navbar-header">
+                <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a href="/" class="navbar-brand">Unleash</a>
+            </div>
+            <nav class="collapse navbar-collapse" role="navigation">
+                <ul class="nav navbar-nav">
+                    <% for(i=0; i<nav.length; i++){ %>
+                        <li><a href=<%=nav[i].Link%>><%=nav[i].Text %></a></li>
+                        <%}%>
+                </ul>
+                <ul class="nav navbar-right navbar-nav">
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><i class="glyphicon glyphicon-search"></i></a>
+                        <ul class="dropdown-menu" style="padding:12px;">
+                            <form class="form-inline">
+                                <button type="submit" class="btn btn-default pull-right"><i class="glyphicon glyphicon-search"></i></button>
+                                <input type="text" class="form-control pull-left" placeholder="Search">
+                            </form>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <div id="UploadBox">
+            <h3>Upload Video:</h3>
+            <span id='UploadArea'>
+                        <div class="col-md-12">
+                        <label for="FileBox">Choose A File: </label><input type="file" id="FileBox"><br>
+                        <label for="NameBox">Name: </label><input type="text" id="NameBox"><br>
+                        <button  type='button' id='UploadButton' class='Button'>Upload</button>
+                        </div>
+                    </span>
+        </div>
+    </div>
+
+
+    <footer>
+        <div class="container">
+            @copyright 2017
+        </div>
+    </footer>
+    <!-- script references -->
+
+</body>
+
+</html>
